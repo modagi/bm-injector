@@ -218,8 +218,6 @@ NTSTATUS WINAPI IC_MyZwResumeThread(HANDLE hThread, PULONG SuspendCount)
 	pFuncPtr--;
 	pdwPrevPID = (DWORD*)pFuncPtr;
 
-//	hMod = GetModuleHandle("ntdll.dll");
-//	pFuncThreadInfo = GetProcAddress(hMod, "ZwQueryInformationThread");
 	statusThread = fZwQueryInformationThread(hThread, 0, &tbi, sizeof(tbi), NULL);
 
     if( !fIC_UnhookAPI((FARPROC)fZwResumeThread, pOrgZwResumeThreadCode) )

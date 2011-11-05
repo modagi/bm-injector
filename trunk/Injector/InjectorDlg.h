@@ -89,6 +89,9 @@ private:
 	CString m_strDllPath;
 	CButton m_btnGlobal;
 	CListCtrl m_listProc;
+	CString m_strLog;
+	CComboBox m_cboLogLevel;
+	int m_nLogLevel;
 public:
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 };

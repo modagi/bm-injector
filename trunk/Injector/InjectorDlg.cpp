@@ -53,6 +53,8 @@ using namespace std;
 CInjectorDlg::CInjectorDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CInjectorDlg::IDD, pParent)
 	, m_strDllPath("")
+	, m_strLog(_T(""))
+	, m_nLogLevel(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 
@@ -66,6 +68,9 @@ void CInjectorDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST_PROC, m_listProc);
 	DDX_Control(pDX, IDC_LIST_RESULT, m_listDllResult);
 	DDX_Control(pDX, IDC_LIST_CODE_RESULT, m_listCodeResult);
+	DDX_Text(pDX, IDC_EDIT_LOG, m_strLog);
+	DDX_Control(pDX, IDC_COMBO_LOGLEVEL, m_cboLogLevel);
+	DDX_CBIndex(pDX, IDC_COMBO_LOGLEVEL, m_nLogLevel);
 }
 
 BEGIN_MESSAGE_MAP(CInjectorDlg, CDialog)
@@ -119,6 +124,9 @@ BOOL CInjectorDlg::OnInitDialog()
 
 	RefreshProcList();
 
+	// Log
+	m_nLogLevel = 1;
+	
 	UpdateData(FALSE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
