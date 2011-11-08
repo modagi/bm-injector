@@ -37,7 +37,7 @@
 #include "CommonDefine.h"
 #include <afxcontrolbars.h>
 
-
+#include "LogWriter.h"
 
 
 #ifdef _UNICODE
