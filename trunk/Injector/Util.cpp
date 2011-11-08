@@ -57,22 +57,33 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 	DWORD					dwOldCount = 0;
 
 	if ( !SetDebugPrivilege(&hProcessToken, &stOldToken, &dwOldCount) )
+	{
+		WRITE_LOG(2, "SetDebugPrivilege was failed.");
 		return FALSE;
+	}
 
 	if ( !(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPid)) )
 	{
+		WRITE_LOG(2, "OpenProcess was failed.");
 		RestorePrivilege(hProcessToken, stOldToken, dwOldCount);
 		return FALSE;
 	}
 
 	if ( !RestorePrivilege(hProcessToken, stOldToken, dwOldCount) )
+	{
+		WRITE_LOG(2, "RestorePrivilege was failed.");
 		return FALSE;
+	}
 	
 	if ( !(pRemoteBuf = VirtualAllocEx(hProcess, NULL, dwBufSize, MEM_COMMIT, PAGE_READWRITE)) )
+	{
+		WRITE_LOG(2, "VirtualAllocEx was failed.");
 		return FALSE;
+	}
 
 	if ( !WriteProcessMemory(hProcess, pRemoteBuf, (LPVOID)szDllName, dwBufSize, NULL) )
 	{
+		WRITE_LOG(2, "WriteProcessMemory was failed.");
 		VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 		CloseHandle(hProcess);
 		return FALSE;
@@ -80,6 +91,7 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 
 	if ( !(hMod = GetModuleHandle("kernel32.dll")) )
 	{
+		WRITE_LOG(2, "GetModuleHandle was failed.");
 		VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 		CloseHandle(hProcess);
 		return FALSE;
@@ -87,6 +99,7 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 
 	if ( !(pThreadProc = (LPTHREAD_START_ROUTINE)GetProcAddress((HINSTANCE)hMod, "LoadLibraryA")) )
 	{
+		WRITE_LOG(2, "GetProcAddress was failed.");
 		VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 		CloseHandle(hProcess);
 		return FALSE;
@@ -96,6 +109,7 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 	{
 		if ( !(hThread = CreateRemoteThread(hProcess, NULL, 0, pThreadProc, pRemoteBuf, 0, NULL)) )
 		{
+			WRITE_LOG(2, "CreateRemoteThread was failed.");
 			VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 			CloseHandle(hProcess);
 			return FALSE;
@@ -107,6 +121,7 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 
 		if ( fNtCreateThreadEx == NULL )
 		{
+			WRITE_LOG(2, "GetProcAddress was failed.");
 			VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 			CloseHandle(hProcess);
 			return FALSE;
@@ -126,6 +141,7 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 
 		if ( hThread == NULL)
 		{
+			WRITE_LOG(2, "NtCreateThreadEx was failed.");
 			DWORD dwErr = GetLastError();
 			VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 			CloseHandle(hProcess);
@@ -135,6 +151,7 @@ BOOL InjectDll(DWORD dwPid, LPCTSTR szDllName)
 
 	if(WaitForSingleObject(hThread, INFINITE))
 	{
+		WRITE_LOG(2, "WaitForSingleObject was failed.");
 		VirtualFreeEx(hProcess, pRemoteBuf, 0, MEM_RELEASE);
 		CloseHandle(hProcess);
 		return FALSE;
@@ -163,7 +180,10 @@ BOOL EjectDll(DWORD dwPID, LPCTSTR szDllName)
 
 	hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, dwPID);
 	if ( hSnapshot == INVALID_HANDLE_VALUE )
+	{
+		WRITE_LOG(2, "CreateToolhelp32Snapshot was failed.");
 		return FALSE;
+	}
 
 	for ( bMore = Module32First(hSnapshot, &me); bMore; bMore = Module32Next(hSnapshot, &me) )
 	{
@@ -182,16 +202,23 @@ BOOL EjectDll(DWORD dwPID, LPCTSTR szDllName)
 	}
 
 	if ( !SetDebugPrivilege(&hProcessToken, &stOldToken, &dwOldCount) )
+	{
+		WRITE_LOG(2, "SetDebugPrivilege was failed.");
 		return FALSE;
+	}
 
 	if ( !(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID)) )
 	{
+		WRITE_LOG(2, "OpenProcess was failed.");
 		RestorePrivilege(hProcessToken, stOldToken, dwOldCount);
 		return FALSE;
 	}
 
 	if ( !RestorePrivilege(hProcessToken, stOldToken, dwOldCount) )
+	{
+		WRITE_LOG(2, "RestorePrivilege was failed.");
 		return FALSE;
+	}
 
 	hModule = GetModuleHandle("kernel32.dll");
 
@@ -200,14 +227,20 @@ BOOL EjectDll(DWORD dwPID, LPCTSTR szDllName)
 	if ( GetOSVersion() < 6 )
 	{
 		if ( !(hThread = CreateRemoteThread(hProcess, NULL, 0, pThreadProc, me.modBaseAddr, 0, NULL)) )
+		{
+			WRITE_LOG(2, "CreateRemoteThread was failed.");
 			return FALSE;
+		}
 	}
 	else
 	{
 		static t_fNtCreateThreadEx fNtCreateThreadEx = (t_fNtCreateThreadEx)GetProcAddress(LoadLibrary("ntdll.dll"), "NtCreateThreadEx");
 
 		if ( fNtCreateThreadEx == NULL )
+		{
+			WRITE_LOG(2, "GetProcAddress was failed.");
 			return FALSE;
+		}
 
 		fNtCreateThreadEx(&hThread,
 			0x1FFFFF,
@@ -222,7 +255,10 @@ BOOL EjectDll(DWORD dwPID, LPCTSTR szDllName)
 			NULL);
 
 		if ( hThread == NULL)
+		{
+			WRITE_LOG(2, "NtCreateThreadEx was failed.");
 			return FALSE;
+		}
 	}
 
 	WaitForSingleObject(hThread, INFINITE);
@@ -262,53 +298,96 @@ BOOL InjectCode(DWORD dwPID, LPCTSTR szDllPath, CInjectionInfo &info)
  //   GLOBAL_VAR *pstGlobalVar = NULL;
 
 	if ( !SetDebugPrivilege(&hProcessToken, &stOldToken, &dwOldCount) )
+	{
+		WRITE_LOG(2, "SetDebugPrivilege was failed.");
 		return FALSE;
+	}
 
     if ( !(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID)) )             // dwProcessId
     {
+		WRITE_LOG(2, "OpenProcess was failed.");
         RestorePrivilege(hProcessToken, stOldToken, dwOldCount);
         return FALSE;
     }
 
 	if ( !RestorePrivilege(hProcessToken, stOldToken, dwOldCount) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "RestorePrivilege was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 
 	if ( !info.SetAddrGlobalVar(AllocGlobalVars(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrGlobalVar was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrPreFunc(InjectCode_MyPreFunction(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrPreFunc was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrHookAPI(InjectCode_HookAPI(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrHookAPI was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrUnhookAPI(InjectCode_UnhookAPI(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrUnhookAPI was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrGetOSVersion(InjectCode_GetOSVersion(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrGetOSVersion was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrSetDebugPrivilege(InjectCode_SetDebugPrivilege(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrSetDebugPrivilege was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrRestorePrivilege(InjectCode_RestorePrivilege(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrRestorePrivilege was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrInjectDll(InjectCode_InjectDll(hProcess, info.GetAddrGetOSVersion(), info.GetAddrSetDebugPrivilege(), info.GetAddrRestorePrivilege())) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrInjectDll was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrMyZwResumeThread(InjectCode_MyZwResumeThread(hProcess, szDllPath, info.GetAddrGlobalVar(), info.GetAddrHookAPI(), info.GetAddrUnhookAPI(), info.GetAddrInjectDll())) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrMyZwResumeThread was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrThreadProc(InjectCode_ThreadProc(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrThreadProc was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrEjectThreadProc(InjectCode_EjectThreadProc(hProcess)) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrEjectThreadProc was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if ( !info.SetAddrThreadParam(PrepareInjectThreadParam(hProcess, info.GetAddrHookAPI(), info.GetAddrMyZwResumeThread(), (PBYTE)info.GetAddrGlobalVar())) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetAddrThreadParam was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 	if( !(hThread = CreateRemoteThread(hProcess,
                                        NULL,
@@ -317,11 +396,16 @@ BOOL InjectCode(DWORD dwPID, LPCTSTR szDllPath, CInjectionInfo &info)
                                        info.GetAddrThreadParam(),
                                        0,
                                        NULL)) )
+	{
+		WRITE_LOG(2, "CreateRemoteThread was failed.");
+		goto END_PROCESS_OF_INJECTCODE;
+	}
 
 
     WaitForSingleObject(hThread, INFINITE);	
 
     CloseHandle(hThread);
+END_PROCESS_OF_INJECTCODE:
     CloseHandle(hProcess);
 
     return TRUE;
@@ -338,19 +422,29 @@ BOOL EjectCode(DWORD dwPID, CInjectionInfo &info)
 
 
 	if ( !SetDebugPrivilege(&hProcessToken, &stOldToken, &dwOldCount) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "SetDebugPrivilege was failed.");
+		goto END_PROCESS_OF_EJECTCODE;
+	}
 
     if ( !(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID)) )
     {
+		WRITE_LOG(2, "OpenProcess was failed.");
         RestorePrivilege(hProcessToken, stOldToken, dwOldCount);
-        return FALSE;
+        goto END_PROCESS_OF_EJECTCODE;
     }
 	 
 	if ( !RestorePrivilege(hProcessToken, stOldToken, dwOldCount) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "RestorePrivilege was failed.");
+		goto END_PROCESS_OF_EJECTCODE;
+	}
 
 	if ( !PrepareEjectThreadParam(hProcess, info.GetAddrThreadParam(), info.GetAddrUnhookAPI()) )
-		return FALSE;
+	{
+		WRITE_LOG(2, "PrepareEjectThreadParam was failed.");
+		goto END_PROCESS_OF_EJECTCODE;
+	}
 
 	if( !(hThread = CreateRemoteThread(hProcess,
                                        NULL,
@@ -359,6 +453,10 @@ BOOL EjectCode(DWORD dwPID, CInjectionInfo &info)
                                        info.GetAddrThreadParam(),
                                        0,
                                        NULL)) )
+	{
+		WRITE_LOG(2, "CreateRemoteThread was failed.");
+		goto END_PROCESS_OF_EJECTCODE;
+	}
 
     WaitForSingleObject(hThread, INFINITE);
 
@@ -367,9 +465,9 @@ BOOL EjectCode(DWORD dwPID, CInjectionInfo &info)
 	if ( !info.Release(hProcess) )
 	{
 		CloseHandle(hProcess);
-		return FALSE;
+		goto END_PROCESS_OF_EJECTCODE;
 	}
-
+END_PROCESS_OF_EJECTCODE:
 	CloseHandle(hProcess);
 
 	return TRUE;

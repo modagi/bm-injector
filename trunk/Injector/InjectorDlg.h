@@ -73,6 +73,7 @@ public:
 // Implementation
 protected:
 	HICON m_hIcon;
+	CListBox m_listLog;
 
 	map<DWORD, CInjectionInfo> m_mapCodeInfo;
 	map<DWORD, CString> m_mapDllInfo;
@@ -89,9 +90,9 @@ private:
 	CString m_strDllPath;
 	CButton m_btnGlobal;
 	CListCtrl m_listProc;
-	CString m_strLog;
 	CComboBox m_cboLogLevel;
 	int m_nLogLevel;
 public:
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+	afx_msg void OnCbnSelchangeComboLoglevel();
 };

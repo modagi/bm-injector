@@ -53,7 +53,6 @@ using namespace std;
 CInjectorDlg::CInjectorDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CInjectorDlg::IDD, pParent)
 	, m_strDllPath("")
-	, m_strLog(_T(""))
 	, m_nLogLevel(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -68,9 +67,9 @@ void CInjectorDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST_PROC, m_listProc);
 	DDX_Control(pDX, IDC_LIST_RESULT, m_listDllResult);
 	DDX_Control(pDX, IDC_LIST_CODE_RESULT, m_listCodeResult);
-	DDX_Text(pDX, IDC_EDIT_LOG, m_strLog);
 	DDX_Control(pDX, IDC_COMBO_LOGLEVEL, m_cboLogLevel);
 	DDX_CBIndex(pDX, IDC_COMBO_LOGLEVEL, m_nLogLevel);
+	DDX_Control(pDX, IDC_LIST_LOG, m_listLog);
 }
 
 BEGIN_MESSAGE_MAP(CInjectorDlg, CDialog)
@@ -84,6 +83,7 @@ BEGIN_MESSAGE_MAP(CInjectorDlg, CDialog)
 	ON_BN_CLICKED(IDC_BTN_GLOBAL, &CInjectorDlg::OnBnClickedBtnCodeInject)
 	ON_BN_CLICKED(IDC_BUTTON2, &CInjectorDlg::OnBnClickedButtonCodeEject)
 	ON_WM_SYSCOMMAND()
+	ON_CBN_SELCHANGE(IDC_COMBO_LOGLEVEL, &CInjectorDlg::OnCbnSelchangeComboLoglevel)
 END_MESSAGE_MAP()
 
 
@@ -92,6 +92,8 @@ END_MESSAGE_MAP()
 BOOL CInjectorDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
+
+	CLogWriter::Initialize(&m_listLog);
 
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
@@ -285,7 +287,12 @@ void CInjectorDlg::OnBnClickedBtnInject()
 		int nListIndex = m_listDllResult.GetItemCount();
 
 		if ( !InjectDll(itSelectedPID->first, m_strDllPath) )
+		{
+			WRITE_LOG(1, "DLL injection was failed");
 			continue;
+		}
+		else
+			WRITE_LOG(3, "DLL injection was succeeded.");
 
 		sprintf(szPID, "0x%08X", itSelectedPID->first);
 		
@@ -340,7 +347,12 @@ void CInjectorDlg::OnBnClickedBtnEject()
 			continue;
 
 		if ( !EjectDll(dwSelectedPID, itInjectedInfo->second) )
+		{
+			WRITE_LOG(1, "DLL ejection was failed.");
 			continue;
+		}
+		else
+			WRITE_LOG(3, "DLL ejection was succeeded.");
 
 		m_listDllResult.DeleteItem(*itSelectedIndex);
 	}
@@ -408,7 +420,12 @@ void CInjectorDlg::OnBnClickedBtnCodeInject()
 		nListIndex = m_listCodeResult.GetItemCount();
 
 		if ( !InjectCode(itSelectedPID->first, m_strDllPath, info) )
+		{
+			WRITE_LOG(1, "Code injection was failed.");
 			continue;
+		}
+		else
+			WRITE_LOG(3, "Code injection was succeeded.");
 
 		sprintf(szPID, "0x%08X", itSelectedPID->first);
 		
@@ -463,7 +480,12 @@ void CInjectorDlg::OnBnClickedButtonCodeEject()
 			continue;
 
 		if ( !EjectCode(itInjectedInfo->first, itInjectedInfo->second) )
+		{
+			WRITE_LOG(1, "Code ejection was failed.");
 			continue;
+		}
+		else
+			WRITE_LOG(3, "Code ejection was succeeded.");
 
 		m_listCodeResult.DeleteItem(*itSelectedIndex);
 	}
@@ -481,4 +503,12 @@ void CInjectorDlg::OnSysCommand(UINT nID, LPARAM lParam)
 	}
 
 	CDialog::OnSysCommand(nID, lParam);
+}
+
+
+void CInjectorDlg::OnCbnSelchangeComboLoglevel()
+{
+	UpdateData(TRUE);
+
+	CLogWriter::SetLogLevel(m_nLogLevel+1);
 }
