@@ -49,6 +49,12 @@ typedef enum
 	COL_RESULTLIST_DLLPATH,
 } ENUM_COL_RESULTLIST;
 
+typedef enum
+{
+	LIST_PROCESS = 0,
+	LIST_INJECTED_PROCESS,
+	LIST_STARTED_PROCESS,
+} ENUM_LIST_TYPE;
 
 // CInjectorDlg dialog
 class CInjectorDlg : public CDialog
@@ -61,7 +67,7 @@ public:
 // Dialog Data
 	enum { IDD = IDD_Injector_DIALOG };
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
 	afx_msg void OnBnClickedBtnDll();
@@ -80,6 +86,9 @@ protected:
 
 	CListCtrl m_listDllResult;
 	CListCtrl m_listCodeResult;
+
+	BOOL DeleteResultItem(DWORD dwPID);
+	BOOL GetSelectedProcesses(int nListType, map<DWORD, CString> &mapSelectedProcess);
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();

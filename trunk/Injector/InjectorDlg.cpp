@@ -182,6 +182,8 @@ void CInjectorDlg::OnBnClickedBtnDll()
 
 	m_strDllPath = dlgFile.GetPathName();
 
+	WRITE_LOG(LOG_LEVEL_3, "DLL path : %s", m_strDllPath);
+
 	UpdateData(FALSE);
 }
 
@@ -200,12 +202,13 @@ BOOL CInjectorDlg::RefreshProcList()
 	m_listProc.DeleteAllItems();
 
 	proc.dwSize = sizeof(PROCESSENTRY32);
+
 	hProcSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	
 	if ( hProcSnapshot == INVALID_HANDLE_VALUE )
 		return FALSE;
 
-	Process32First(hProcSnapshot, &proc);
+	if ( Process32First(hProcSnapshot, &proc) == FALSE )
+		return FALSE;
 
 	do
 	{
@@ -231,13 +234,14 @@ BOOL CInjectorDlg::RefreshProcList()
 }
 void CInjectorDlg::OnBnClickedBtnRefresh()
 {
-	RefreshProcList();
+	if ( RefreshProcList() == FALSE )
+		WRITE_LOG(LOG_LEVEL_1, "Failed to refresh");
 }
 
 void CInjectorDlg::OnBnClickedBtnInject()
 {
-	map<DWORD, CString>				mapSelectedPID;
-	map<DWORD, CString>::iterator	itSelectedPID;
+	map<DWORD, CString>				mapSelectedProcess;
+	map<DWORD, CString>::iterator	itSelectedProcess;
 
 	int		nSelectedIndex	= 0;
 	int		nPosDLLName		= 0;
@@ -267,42 +271,34 @@ void CInjectorDlg::OnBnClickedBtnInject()
 	else
 		strDLLName = m_strDllPath.Mid(nPosDLLName + 1);
 
-	nSelectedIndex = m_listProc.GetNextItem(-1, LVNI_SELECTED);
-	while ( nSelectedIndex != -1 )
-	{
-		dwSelectedPID = m_listProc.GetItemData(nSelectedIndex);
-		mapSelectedPID[dwSelectedPID] = m_listProc.GetItemText(nSelectedIndex, COL_PROCLIST_PROCNAME);
-
-		nSelectedIndex = m_listProc.GetNextItem(nSelectedIndex, LVNI_SELECTED);
-	}
-
-	if ( mapSelectedPID.size() == 0 )
+	GetSelectedProcesses(LIST_PROCESS, mapSelectedProcess);
+	if ( mapSelectedProcess.size() == 0 )
 	{
 		MessageBox("Select a process");
 		return;
 	}
 
-	for ( itSelectedPID = mapSelectedPID.begin(); itSelectedPID != mapSelectedPID.end(); itSelectedPID++ )
+	for ( itSelectedProcess = mapSelectedProcess.begin(); itSelectedProcess != mapSelectedProcess.end(); itSelectedProcess++ )
 	{
 		int nListIndex = m_listDllResult.GetItemCount();
 
-		if ( !InjectDll(itSelectedPID->first, m_strDllPath) )
+		if ( !InjectDll(itSelectedProcess->first, m_strDllPath) )
 		{
-			WRITE_LOG(1, "DLL injection was failed");
+			WRITE_LOG(LOG_LEVEL_1, "DLL injection was failed. 0x%08X %s", itSelectedProcess->first, itSelectedProcess->second);
 			continue;
 		}
-		else
-			WRITE_LOG(3, "DLL injection was succeeded.");
 
-		sprintf(szPID, "0x%08X", itSelectedPID->first);
+		sprintf(szPID, "0x%08X", itSelectedProcess->first);
 		
 		m_listDllResult.InsertItem(nListIndex, szPID);
-		m_listDllResult.SetItemData(nListIndex, itSelectedPID->first);
-		m_listDllResult.SetItem(nListIndex, COL_RESULTLIST_PROCNAME, LVIF_TEXT, itSelectedPID->second, 0, 0, 0, NULL);	
+		m_listDllResult.SetItemData(nListIndex, itSelectedProcess->first);
+		m_listDllResult.SetItem(nListIndex, COL_RESULTLIST_PROCNAME, LVIF_TEXT, itSelectedProcess->second, 0, 0, 0, NULL);	
 		m_listDllResult.SetItem(nListIndex, COL_RESULTLIST_DLLNAME, LVIF_TEXT, strDLLName, 0, 0, 0, NULL);	
 		m_listDllResult.SetItem(nListIndex, COL_RESULTLIST_DLLPATH, LVIF_TEXT, m_strDllPath, 0, 0, 0, NULL);
 
-		m_mapDllInfo[itSelectedPID->first] = m_strDllPath;
+		m_mapDllInfo[itSelectedProcess->first] = m_strDllPath;
+
+		WRITE_LOG(LOG_LEVEL_3, "DLL injection was succeeded. 0x%08X %s", itSelectedProcess->first, itSelectedProcess->second);
 	}
 }
 
@@ -310,8 +306,8 @@ void CInjectorDlg::OnBnClickedBtnEject()
 {
 	map<DWORD, CString>::iterator itInjectedInfo;
 
-	vector<int>				vecSelectedIndex;
-	vector<int>::iterator	itSelectedIndex;
+	map<DWORD, CString>				mapSelectedProcess;
+	map<DWORD, CString>::iterator	itSelectedProcess;
 
 	int		nSelectedIndex		= 0;
 	int		nPosDLLName			= 0;
@@ -320,48 +316,38 @@ void CInjectorDlg::OnBnClickedBtnEject()
 	CString strInjectedDllName	= "";
 	int		i					= 0;
 	
-	nSelectedIndex = m_listDllResult.GetNextItem(-1, LVNI_SELECTED);
-	while ( nSelectedIndex != -1 )
-	{
-		vecSelectedIndex.push_back(nSelectedIndex);
-
-		nSelectedIndex = m_listDllResult.GetNextItem(nSelectedIndex, LVNI_SELECTED);
-	}
-
-	if ( vecSelectedIndex.size() == 0 )
+	GetSelectedProcesses(LIST_INJECTED_PROCESS, mapSelectedProcess);
+	if ( mapSelectedProcess.size() == 0 )
 	{
 		MessageBox("Select a Injected Information.");
 		return;
 	}
 	
-	itSelectedIndex = vecSelectedIndex.end();
-
-	for ( i = 0; i < vecSelectedIndex.size(); i++)
+	itSelectedProcess = mapSelectedProcess.end();
+	for ( i = 0; i < mapSelectedProcess.size(); i++)
 	{
-		itSelectedIndex--;
+		itSelectedProcess--;
 
-		dwSelectedPID = m_listDllResult.GetItemData(*itSelectedIndex);
-
-		itInjectedInfo = m_mapDllInfo.find(dwSelectedPID);
+		itInjectedInfo = m_mapDllInfo.find(itSelectedProcess->first);
 		if ( itInjectedInfo == m_mapDllInfo.end() )
 			continue;
 
-		if ( !EjectDll(dwSelectedPID, itInjectedInfo->second) )
+		if ( !EjectDll(itSelectedProcess->first, itInjectedInfo->second) )
 		{
-			WRITE_LOG(1, "DLL ejection was failed.");
+			WRITE_LOG(LOG_LEVEL_1, "DLL ejection was failed. 0x%08X %s", itSelectedProcess->first, itSelectedProcess->second);
 			continue;
 		}
-		else
-			WRITE_LOG(3, "DLL ejection was succeeded.");
 
-		m_listDllResult.DeleteItem(*itSelectedIndex);
+		DeleteResultItem(itSelectedProcess->first);
+
+		WRITE_LOG(LOG_LEVEL_3, "DLL ejection was succeeded. 0x%08X %s", itSelectedProcess->first, itSelectedProcess->second);
 	}
 }
 
 void CInjectorDlg::OnBnClickedBtnCodeInject()
 {
-	map<DWORD, CString>				mapSelectedPID;
-	map<DWORD, CString>::iterator	itSelectedPID;
+	map<DWORD, CString>				mapSelectedProcess;
+	map<DWORD, CString>::iterator	itSelectedProcess;
 
 	CInjectionInfo	info;
 
@@ -397,45 +383,37 @@ void CInjectorDlg::OnBnClickedBtnCodeInject()
 	else
 		strDLLName = m_strDllPath.Mid(nPosDLLName + 1);
 
-	nSelectedIndex = m_listProc.GetNextItem(-1, LVNI_SELECTED);
-	while ( nSelectedIndex != -1 )
-	{
-		dwSelectedPID = m_listProc.GetItemData(nSelectedIndex);
-		mapSelectedPID[dwSelectedPID] = m_listProc.GetItemText(nSelectedIndex, COL_PROCLIST_PROCNAME);
-
-		nSelectedIndex = m_listProc.GetNextItem(nSelectedIndex, LVNI_SELECTED);
-	}
-
-	if ( mapSelectedPID.size() == 0 )
+	GetSelectedProcesses(LIST_PROCESS, mapSelectedProcess);
+	if ( mapSelectedProcess.size() == 0 )
 	{
 		MessageBox("Select a process");
 		return;
 	}
 
-	for ( itSelectedPID = mapSelectedPID.begin(); itSelectedPID != mapSelectedPID.end(); itSelectedPID++)
+	for ( itSelectedProcess = mapSelectedProcess.begin(); itSelectedProcess != mapSelectedProcess.end(); itSelectedProcess++)
 	{
 		info.Initialize();
 		info.SetDLLPath(m_strDllPath);
 
 		nListIndex = m_listCodeResult.GetItemCount();
 
-		if ( !InjectCode(itSelectedPID->first, m_strDllPath, info) )
+		if ( !InjectCode(itSelectedProcess->first, m_strDllPath, info) )
 		{
-			WRITE_LOG(1, "Code injection was failed.");
+			WRITE_LOG(LOG_LEVEL_1, "Code injection was failed.");
 			continue;
 		}
 		else
-			WRITE_LOG(3, "Code injection was succeeded.");
+			WRITE_LOG(LOG_LEVEL_3, "Code injection was succeeded.");
 
-		sprintf(szPID, "0x%08X", itSelectedPID->first);
+		sprintf(szPID, "0x%08X", itSelectedProcess->first);
 		
 		m_listCodeResult.InsertItem(nListIndex, szPID);
-		m_listCodeResult.SetItemData(nListIndex, itSelectedPID->first);
-		m_listCodeResult.SetItem(nListIndex, COL_RESULTLIST_PROCNAME, LVIF_TEXT, itSelectedPID->second, 0, 0, 0, NULL);	
+		m_listCodeResult.SetItemData(nListIndex, itSelectedProcess->first);
+		m_listCodeResult.SetItem(nListIndex, COL_RESULTLIST_PROCNAME, LVIF_TEXT, itSelectedProcess->second, 0, 0, 0, NULL);	
 		m_listCodeResult.SetItem(nListIndex, COL_RESULTLIST_DLLNAME, LVIF_TEXT, strDLLName, 0, 0, 0, NULL);	
 		m_listCodeResult.SetItem(nListIndex, COL_RESULTLIST_DLLPATH, LVIF_TEXT, m_strDllPath, 0, 0, 0, NULL);
 
-		m_mapCodeInfo[itSelectedPID->first] = info;
+		m_mapCodeInfo[itSelectedProcess->first] = info;
 	}
 }
 
@@ -443,8 +421,8 @@ void CInjectorDlg::OnBnClickedButtonCodeEject()
 {
 	map<DWORD, CInjectionInfo>::iterator itInjectedInfo;
 
-	vector<int>				vecSelectedIndex;
-	vector<int>::iterator	itSelectedIndex;
+	map<DWORD, CString>				mapSelectedProcess;
+	map<DWORD, CString>::iterator	itSelectedProcess;
 
 	int		nSelectedIndex		= 0;
 	int		nPosDLLName			= 0;
@@ -453,27 +431,20 @@ void CInjectorDlg::OnBnClickedButtonCodeEject()
 	CString strInjectedDllName	= "";
 	int		i					= 0;
 
-	nSelectedIndex = m_listCodeResult.GetNextItem(-1, LVNI_SELECTED);
-	while(nSelectedIndex != -1)
-	{
-		vecSelectedIndex.push_back(nSelectedIndex);
-
-		nSelectedIndex = m_listCodeResult.GetNextItem(nSelectedIndex, LVNI_SELECTED);
-	}
-
-	if ( vecSelectedIndex.size() == 0 )
+	GetSelectedProcesses(LIST_STARTED_PROCESS, mapSelectedProcess);
+	if ( mapSelectedProcess.size() == 0 )
 	{
 		MessageBox("Select a Injected Information.");
 		return;
 	}
 	
-	itSelectedIndex = vecSelectedIndex.end();
+	itSelectedProcess = mapSelectedProcess.end();
 
-	for ( i = 0; i < vecSelectedIndex.size(); i++)
+	for ( i = 0; i < mapSelectedProcess.size(); i++)
 	{
-		itSelectedIndex--;
+		itSelectedProcess--;
 
-		dwSelectedPID = m_listCodeResult.GetItemData(*itSelectedIndex);
+		dwSelectedPID = m_listCodeResult.GetItemData(itSelectedProcess->first);
 
 		itInjectedInfo = m_mapCodeInfo.find(dwSelectedPID);
 		if ( itInjectedInfo == m_mapCodeInfo.end() )
@@ -481,13 +452,13 @@ void CInjectorDlg::OnBnClickedButtonCodeEject()
 
 		if ( !EjectCode(itInjectedInfo->first, itInjectedInfo->second) )
 		{
-			WRITE_LOG(1, "Code ejection was failed.");
+			WRITE_LOG(LOG_LEVEL_1, "Code ejection was failed.");
 			continue;
 		}
 		else
-			WRITE_LOG(3, "Code ejection was succeeded.");
+			WRITE_LOG(LOG_LEVEL_3, "Code ejection was succeeded.");
 
-		m_listCodeResult.DeleteItem(*itSelectedIndex);
+		m_listCodeResult.DeleteItem(itSelectedProcess->first);
 	}
 }
 
@@ -511,4 +482,48 @@ void CInjectorDlg::OnCbnSelchangeComboLoglevel()
 	UpdateData(TRUE);
 
 	CLogWriter::SetLogLevel(m_nLogLevel+1);
+}
+
+BOOL CInjectorDlg::DeleteResultItem(DWORD dwPID)
+{
+	int nIndex = 0;
+	DWORD dwListData = 0;
+
+	nIndex = m_listDllResult.GetNextItem(-1, LVNI_ALL);
+	while ( nIndex != -1 )
+	{
+		dwListData = m_listDllResult.GetItemData(nIndex);
+		if ( dwListData == dwPID )
+		{
+			m_listDllResult.DeleteItem(nIndex);
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+BOOL CInjectorDlg::GetSelectedProcesses(int nListType, map<DWORD, CString> &mapSelectedProcess)
+{
+	int			nSelectedIndex = 0;
+	DWORD		dwSelectedPID = 0;
+	CListCtrl	*pList = NULL;
+
+	switch ( nListType )
+	{
+	case LIST_PROCESS:			pList = &m_listProc;		break;
+	case LIST_INJECTED_PROCESS: pList = &m_listDllResult;	break;
+	case LIST_STARTED_PROCESS:	pList = &m_listCodeResult;	break;
+	}
+
+	nSelectedIndex = pList->GetNextItem(-1, LVNI_SELECTED);
+	while ( nSelectedIndex != -1 )
+	{
+		dwSelectedPID = pList->GetItemData(nSelectedIndex);
+		mapSelectedProcess.insert(make_pair(dwSelectedPID, pList->GetItemText(nSelectedIndex, COL_PROCLIST_PROCNAME)));
+
+		nSelectedIndex = pList->GetNextItem(nSelectedIndex, LVNI_SELECTED);
+	}
+
+	return TRUE;
 }
