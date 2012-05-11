@@ -26,6 +26,14 @@
 
 #define WRITE_LOG CLogWriter::WriteLog
 
+enum
+{
+	LOG_LEVEL_1 = 1,
+	LOG_LEVEL_2 = 2,
+	LOG_LEVEL_3 = 3,
+	LOG_LEVEL_4 = 4
+};
+
 class CLogWriter
 {
 public:

@@ -52,6 +52,7 @@ BOOL CLogWriter::SetLogLevel(int nLogLevel)
 
 BOOL CLogWriter::WriteLog(int nLogLevel, LPCSTR lpFormat, ...)
 {
+	CString strMsg = "";
 	CString strLog = "";
 	va_list pArg;
 
@@ -61,11 +62,21 @@ BOOL CLogWriter::WriteLog(int nLogLevel, LPCSTR lpFormat, ...)
 	if ( m_pListLog == NULL )
 		return FALSE;
 
+	switch (nLogLevel)
+	{
+	case 1:	strLog = "[ERROR] ";	break;
+	case 2: strLog = "[WARN]  ";	break;
+	case 3: strLog = "[INFO]  ";	break;
+	case 4: strLog = "[DEBUG] ";	break;
+	}
+
 	va_start(pArg, lpFormat);
 
-	strLog.Format(lpFormat, pArg);
+	strMsg.Format(lpFormat, pArg);
 
 	va_end(pArg);
+
+	strLog += strMsg;
 
 	m_pListLog->SetCurSel(m_pListLog->AddString(strLog));
 
