@@ -549,7 +549,7 @@ LPVOID AllocGlobalVars(HANDLE hProcess)
 		WRITE_LOG(LOG_LEVEL_1, "VirtualAllocEx was failed.");
 		return NULL;
 	}
-	const char *ptr = __func__;
+
 	dwData = (DWORD)pData;
 
 	if( !WriteProcessMemory(hProcess, pStructPtr++, &dwData, sizeof(dwData), NULL) )
